@@ -4,95 +4,132 @@ using TUIO;
 using System.Collections.Generic;
 
 public class TouchReceiver : MonoBehaviour
-{
-	//alt
-	TuioCursor[] cursorArray;
-	Vector3[] latestPosition;
-	int arraySize = 10;
-	
-	//aktuell
+{	
 	bool[] pressedArray;
-	Vector3[] vectorPositionOld;
-	Vector3[] vectorPositionUpdated;
+	Vector4[] vectorPositionOld;
+	Vector4[] vectorPositionUpdated;
 	int numberSupportedCursors = 2;
+	public Camera cam;
 
+	//Transformationsmatrizen:
+	Matrix4x4 transformationMatrix = Matrix4x4.identity;
 
+	Matrix4x4 translationMatrix;
+	Matrix4x4 rotationMatrix;
+	Matrix4x4 scalingMatrix;
+
+	public float rotWinkel = 12.0f;
+
+	private Mesh mesh;
+	private Vector3[] vertices;
+
+	
 	// Use this for initialization
 	void Start()
 	{
-		cursorArray = new TuioCursor[arraySize];
-		latestPosition = new Vector3[arraySize];
-		
-		pressedArray = new bool[arraySize];
-		vectorPositionOld = new Vector3[numberSupportedCursors];
-		vectorPositionUpdated = new Vector3[numberSupportedCursors];
+		pressedArray = new bool[numberSupportedCursors];
+		vectorPositionOld = new Vector4[numberSupportedCursors];
+		vectorPositionUpdated = new Vector4[numberSupportedCursors];
+
+		mesh = GetComponent<MeshFilter>().mesh;
+		vertices = mesh.vertices;
+
 	}
 	
 	// Update is called once per frame
+	//Hier nur Transformations-Matrix anwenden.
 	void Update()
 	{
-		for (int i = 0; i < numberSupportedCursors; i++){
-			if (pressedArray[i]){
-				Vector3 pos1 = vectorPositionOld[i];
-				Vector3 pos2 = vectorPositionUpdated[i];
-				Debug.Log("Positionen: (" + pos1.x + "|" + pos1.y + ") (" + pos2.x + "|" + pos2.y + ")");
-			}
+
+		Vector3 worldCoords = cam.ScreenToWorldPoint(vectorPositionOld[0]);
+
+//		Debug.Log("Transformations:Matrix: " + translationMatrix.ToString());
+//		Debug.Log("Transformations:Position: " + gameObject.rigidbody.position);
+//		Debug.Log("Koordinaten: " + translationMatrix.MultiplyVector(new Vector3()));
+
+		//Transformationsmatrix auf Vertices einzeln anwenden:
+		int j = 0;
+		while (j < vertices.Length) {
+			vertices[j] = transformationMatrix.MultiplyPoint(worldCoords);
+			j++;
 		}
-//		for (int i = 0; i <arraySize;i++)
-//		{
-////			if (pressedArray[i])
-////			{
-////				//Debug.Log("TE: " + cursorArray[i].getCursorID() + ": pressed - (" + cursorArray[i].getX() + " ; " + cursorArray[i].getY() + ")");
-////				if (!latestPosition[i].Equals(Vector3.zero)){
-////					//Falls verschiebung erkennbar
-////					Debug.Log("Zwei Werte, theoretisch verschiebbar");
-////					Vector3 position = new Vector3(cursorArray[i].getX(), cursorArray[i].getY(), 1);
-////					//aktion durchführen
-////
-////
-////					latestPosition[i] = position;
-////				} else {
-////					//noch keine vorherige Position bekannt
-////					Debug.Log("Nur ein Eintrag.");
-////					latestPosition[i] = new Vector3(cursorArray[i].getX(), cursorArray[i].getY(), 1);
-////				}
-////			} else {
-////				//Entferne latest Eintrag für ungepresste Cursor
-////				latestPosition[i] = Vector3.zero;
-////			}
-//		}
+
+		Debug.Log("Transformationsmatrix: " + transformationMatrix);
+
+		//Debug.Log("Positionen: (" + pos1.x + "|" + pos1.y + ") (" + pos2.x + "|" + pos2.y + ")");
+
+		mesh.vertices = vertices;
+		Debug.Log("vertices: ");
+		foreach (var item in vertices)
+		{
+			Debug.Log("----: " + item);
+		}
+		mesh.RecalculateBounds();
+		mesh.RecalculateNormals();
+		
+		transform.position = vertices [0];
+
 	}
 
+	/**
+	 * Event-Routine für jedes TUIO-Event.
+	 * Hier nur Transformations-Matrix berechnen.
+	 */
 	void processEvents(ArrayList events)
 	{
 		int i = 0;
 		foreach (BBCursorEvent cursorEvent in events)
 		{
 			TuioCursor mycursor = cursorEvent.cursor;
+			//i ist ID des Finger
 			i = mycursor.getCursorID();
-			//mycursor.getCursorID get the ID
-			//cursorEvent.state get the state
-
-			cursorArray [i] = mycursor;
-
-
-
+			
+			//TUIO-Event für neuen Touch:
 			if (cursorEvent.state.Equals(BBCursorState.Add)){
 				pressedArray [i] = true;
-				vectorPositionOld[i] = new Vector3(mycursor.getX(), mycursor.getY(), 1);
-				vectorPositionUpdated[i] = new Vector3(mycursor.getX(), mycursor.getY(), 1);
+				vectorPositionOld[i] = new Vector4(mycursor.getX()*Screen.width, Screen.height-mycursor.getY()*Screen.height, 1,0);
+				vectorPositionUpdated[i] = new Vector4(mycursor.getX()*Screen.width, Screen.height-mycursor.getY()*Screen.height, 1,0);
+			//TUIO-Event für Touch-Auflösung:
 			} else if (cursorEvent.state.Equals(BBCursorState.Remove)){
 				pressedArray [i] = false;
+		    //TUIO-Event für Position-Update:
 			} else {
-				vectorPositionUpdated[i] = new Vector3(mycursor.getX(), mycursor.getY(), 1);
+				vectorPositionUpdated[i] = new Vector4(mycursor.getX()*Screen.width, Screen.height-mycursor.getY()*Screen.height, 1,0);
 				//Berechnung wohl erst im Update loop
 				//Calculate new TransformationMatrix
 				//nächste ausgangsposition auf neue position setzen
 				//vectorPositionOld[i] = vectorPositionUpdated[i];
 
+				//Translationsmatrix berechnen:
+				if (i == 0) {
+					Vector3 worldCoords = cam.ScreenToWorldPoint(vectorPositionUpdated[i]);
+	//				Debug.Log("TUIOCoords: " + vectorPositionUpdated[i]);
+					translationMatrix = new Matrix4x4();
+					translationMatrix.SetRow(0,new Vector4(1,0,0,-worldCoords.x));
+					translationMatrix.SetRow(1,new Vector4(0,1,0,-worldCoords.y));
+					translationMatrix.SetRow(2,new Vector4(0,0,1,0));
+					translationMatrix.SetRow(3,new Vector4(0,0,0,1));
+					//Debug.Log("Transformations:Matrix: " + translationMatrix.ToString());
+				}
+
+				//Rotationsmatrix berechnen:
+				if (pressedArray[0] && pressedArray[1]) {
+
+				    //Winkel berchnen: ??
+				  
+					//				Debug.Log("TUIOCoords: " + vectorPositionUpdated[i]);
+					rotationMatrix = new Matrix4x4();
+					rotationMatrix.SetRow(0,new Vector4(Mathf.Cos(rotWinkel),-Mathf.Sin(rotWinkel),0,0));
+					rotationMatrix.SetRow(1,new Vector4(Mathf.Sin(rotWinkel), Mathf.Cos(rotWinkel),0,0));
+					rotationMatrix.SetRow(2,new Vector4(0,0,1,0));
+					rotationMatrix.SetRow(3,new Vector4(0,0,0,1));
+				}
 			}
-		}
+		} //end for
+
+		//TransformationsMatrix aufbauen
+		transformationMatrix = translationMatrix; //rotationMatrix;//* translationMatrix;
+		
+		
 	}
-	
-	
 }
