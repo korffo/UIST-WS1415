@@ -57,18 +57,31 @@ public class TouchReceiver : MonoBehaviour
 			j++;
 		}
 		
-		Debug.Log("Transformationsmatrix: " + transformationMatrix);
+//		Debug.Log("Transformationsmatrix: " + transformationMatrix);
 		
 		//Debug.Log("Positionen: (" + pos1.x + "|" + pos1.y + ") (" + pos2.x + "|" + pos2.y + ")");
 		
 		mesh.vertices = vertices;
-		Debug.Log("vertices: ");
-		foreach (var item in vertices)
-		{
-			Debug.Log("----: " + item);
-		}
+//		Debug.Log("vertices: ");
+//		foreach (var item in vertices)
+//		{
+//			Debug.Log("----: " + item);
+//		}
 		mesh.RecalculateBounds();
 		mesh.RecalculateNormals();
+
+
+//		//Keine Toucheventsvorahnden
+//		int activeEvents = 0;
+//		foreach(bool b in pressedArray){
+//			if (b){
+//				activeEvents++;
+//			}
+//		}
+//
+//		if(activeEvents == 0){
+//			verticesStart = (Vector3[]) vertices.Clone();
+//		}
 	}
 	
 	/**
@@ -118,17 +131,28 @@ public class TouchReceiver : MonoBehaviour
 					//Winkel berchnen: ??
 					
 					//				Debug.Log("TUIOCoords: " + vectorPositionUpdated[i]);
+					rotWinkel = Vector3.Angle(vectorPositionUpdated[0],vectorPositionUpdated[1]);
 					rotationMatrix = new Matrix4x4();
 					rotationMatrix.SetRow(0,new Vector4(Mathf.Cos(rotWinkel),-Mathf.Sin(rotWinkel),0,0));
 					rotationMatrix.SetRow(1,new Vector4(Mathf.Sin(rotWinkel), Mathf.Cos(rotWinkel),0,0));
 					rotationMatrix.SetRow(2,new Vector4(0,0,1,0));
 					rotationMatrix.SetRow(3,new Vector4(0,0,0,1));
+
+					//Abstände berechnen
+					float d1 = Vector3.Distance(vectorPositionOld[0], vectorPositionOld[1]);
+					float d2 = Vector3.Distance(vectorPositionUpdated[0], vectorPositionUpdated[1]);
+					Debug.Log("Abstände: - alt "+d1+" - neu "+d2);
+					scalingMatrix = new Matrix4x4();
+					scalingMatrix.SetRow(0,new Vector4(d2/d1,0,0,0));
+					scalingMatrix.SetRow(1,new Vector4(0,d2/d1,0,0));
+					scalingMatrix.SetRow(2,new Vector4(0,0,1,0));
+					scalingMatrix.SetRow(3,new Vector4(0,0,0,1));
 				}
 			}
 		} //end for
 		
 		//TransformationsMatrix aufbauen
-		transformationMatrix = translationMatrix; //rotationMatrix;//* translationMatrix;
+		transformationMatrix = scalingMatrix * rotationMatrix * translationMatrix;
 		
 		
 	}
